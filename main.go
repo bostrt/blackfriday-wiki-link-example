@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"regexp"
@@ -40,7 +41,11 @@ func (r *Renderer) RenderNode(w io.Writer, node *bf.Node, entering bool) bf.Walk
 	// Only touch camel-cased words when they are not inside of a Link node.
 	if node.Parent != nil && node.Parent.Type != bf.Link {
 		if entering {
-			w.Write(r.wikLink(node.Literal))
+			md := r.wikLink(node.Literal)
+			if md != nil {
+				w.Write(md)
+				return bf.SkipChildren
+			}
 		}
 	}
 
@@ -57,9 +62,19 @@ func (r *Renderer) RenderFooter(w io.Writer, ast *bf.Node) {
 }
 
 func (r *Renderer) wikLink(b []byte) []byte {
+	// We don't care about anything less than two characters b/c that wouldn't qualify as camel-case.
+	if len(b) <= 2 {
+		return nil
+	}
+
 	markdown := validPage.ReplaceAll(
 		b,
 		[]byte(fmt.Sprintf("[$1](%s$1)", "/view/")),
 	)
+
+	if bytes.Compare(b, markdown) == 0 {
+		return nil
+	}
+
 	return markdown
 }
